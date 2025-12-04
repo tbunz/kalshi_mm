@@ -37,7 +37,7 @@ MAX_RUNTIME = 1800  # 30 minutes
 # ============================================================================
 
 # API base URL (usually don't need to change this)
-API_BASE_URL = "https://trading-api.kalshi.com/trade-api/v2"
+API_BASE_URL = "https://api.elections.kalshi.com/trade-api/v2"
 
 # Whether to use demo/paper trading mode
 USE_DEMO_MODE = True
