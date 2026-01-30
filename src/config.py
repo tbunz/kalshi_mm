@@ -14,20 +14,20 @@ MARKET_TICKER = "KXPRESNOMD-28-GN"
 # ============================================================================
 
 # Maximum position size per market (number of contracts)
-MAX_POSITION_SIZE = 10
+MAX_POSITION_SIZE = 2
 
 # Maximum total exposure across all markets (in dollars)
-MAX_TOTAL_EXPOSURE = 10
+MAX_TOTAL_EXPOSURE = 2
 
 # ============================================================================
 # QUOTER PARAMETERS
 # ============================================================================
 
 # Total spread width in cents (our bid at mid - SPREAD_WIDTH/2, ask at mid + SPREAD_WIDTH/2)
-SPREAD_WIDTH = 6
+SPREAD_WIDTH = 14
 
 # Number of contracts per quote side
-QUOTE_SIZE = 5
+QUOTE_SIZE = 1
 
 # Requote when midpoint moves by this many cents
 REQUOTE_THRESHOLD = 2
@@ -44,7 +44,7 @@ INVENTORY_SKEW_PER_CONTRACT = 1
 LOOP_INTERVAL = 5
 
 # Maximum runtime (seconds) - for testing
-MAX_RUNTIME = 1800  # 30 minutes
+MAX_RUNTIME = 120
 
 # ============================================================================
 # API CONFIGURATION
