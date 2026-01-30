@@ -45,16 +45,16 @@ class DemoRunner:
 
         try:
             result = await fn(*args, **kwargs)
-            print(f"  ✓ Done")
+            print(f"  [OK] Done")
             self.context['last_result'] = result
             return result
         except Exception as e:
-            print(f"  ✗ FAILED: {e}")
+            print(f"  [FAIL] {e}")
             raise
 
     def show(self, message: str):
         """Print info without a step number."""
-        print(f"  → {message}")
+        print(f"  > {message}")
 
     def header(self):
         """Print test suite header."""

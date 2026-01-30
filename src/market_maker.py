@@ -1,6 +1,7 @@
 from .kalshi_client import KalshiClient
 from .position_manager import PositionManager
 from .order_manager import OrderManager
+from .quoter import Quoter
 from .models import Side
 from . import config
 from src.error.exceptions import AuthenticationError
@@ -26,6 +27,7 @@ class MarketMakerBot:
         self.client = KalshiClient(KEY_ID, KEY)
         self.position_manager = PositionManager(self.client)
         self.order_manager = OrderManager(self.client)
+        self.quoter = Quoter(self)
         logger.info("MarketMakerBot initialized successfully")
 
     async def __aenter__(self):
@@ -108,7 +110,8 @@ class MarketMakerBot:
         side: str,
         count: int,
         price_cents: int,
-        ticker: str = None
+        ticker: str = None,
+        skip_limit_check: bool = False
     ) -> str:
         """
         Place a limit order.
@@ -119,11 +122,37 @@ class MarketMakerBot:
             count: Number of contracts
             price_cents: Limit price in cents (1-99)
             ticker: Market ticker (defaults to config.MARKET_TICKER)
+            skip_limit_check: If True, bypass position/exposure limits (use with caution)
 
         Returns:
             order_id string
+
+        Raises:
+            ValueError: If order would exceed position/exposure limits
         """
         ticker = ticker or config.MARKET_TICKER
+
+        # Enforce position/exposure limits unless explicitly skipped
+        if not skip_limit_check:
+            # Determine exposure side and price based on action
+            # BUY YES = YES exposure, SELL YES = NO exposure
+            # BUY NO = NO exposure, SELL NO = YES exposure
+            if action.lower() == "buy":
+                exposure_side = side
+                exposure_price = price_cents
+            else:  # sell
+                exposure_side = "no" if side.lower() == "yes" else "yes"
+                exposure_price = 100 - price_cents
+
+            can_place, reason = self.can_place_order(
+                ticker=ticker,
+                side=exposure_side,
+                contracts=count,
+                price_cents=exposure_price
+            )
+            if not can_place:
+                raise ValueError(f"Order blocked by limits: {reason}")
+
         return await self.order_manager.place_order(
             ticker=ticker,
             action=action,
@@ -218,7 +247,7 @@ class MarketMakerBot:
 
 async def main(bid_price: int, ask_price: int, nonstop: bool = False):
     """Run interactive demo tests."""
-    from src.demo import run_order_tests
+    from src.demo import run_order_tests, run_quoter_tests
 
     async with MarketMakerBot() as bot:
         # Show account info
@@ -232,6 +261,9 @@ async def main(bid_price: int, ask_price: int, nonstop: bool = False):
 
         # Run order tests
         await run_order_tests(bot, bid_price=bid_price, ask_price=ask_price, nonstop=nonstop)
+
+        # Run quoter tests
+        await run_quoter_tests(bot, bid_price=bid_price, ask_price=ask_price, nonstop=nonstop)
 
 
 if __name__ == "__main__":
