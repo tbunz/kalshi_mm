@@ -19,8 +19,9 @@ class DemoRunner:
         demo.footer(passed=True)
     """
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, nonstop: bool = False):
         self.name = name
+        self.nonstop = nonstop
         self.step_num = 0
         self.context = {}  # Shared state between steps
 
@@ -37,7 +38,10 @@ class DemoRunner:
             Result of fn (also stored in self.context['last_result'])
         """
         self.step_num += 1
-        input(f"\n[STEP {self.step_num}] {description} (Enter to run)")
+        if self.nonstop:
+            print(f"\n[STEP {self.step_num}] {description}")
+        else:
+            input(f"\n[STEP {self.step_num}] {description} (Enter to run)")
 
         try:
             result = await fn(*args, **kwargs)
@@ -55,7 +59,10 @@ class DemoRunner:
     def header(self):
         """Print test suite header."""
         print("\n" + "=" * 60)
-        print(f"{self.name} (press Enter after each step)")
+        if self.nonstop:
+            print(f"{self.name} (nonstop mode)")
+        else:
+            print(f"{self.name} (press Enter after each step)")
         print("=" * 60)
 
     def footer(self, passed: bool):

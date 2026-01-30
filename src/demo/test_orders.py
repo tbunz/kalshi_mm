@@ -2,7 +2,7 @@
 from .runner import DemoRunner
 
 
-async def run_order_tests(bot):
+async def run_order_tests(bot, nonstop: bool = False):
     """
     Interactive order management tests.
 
@@ -15,7 +15,7 @@ async def run_order_tests(bot):
         6. Cancel all
         7. Verify clean
     """
-    demo = DemoRunner("ORDER MANAGEMENT TESTS")
+    demo = DemoRunner("ORDER MANAGEMENT TESTS", nonstop=nonstop)
     demo.header()
 
     # Test 1: Place bid
