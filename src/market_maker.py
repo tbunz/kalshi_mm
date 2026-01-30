@@ -1,7 +1,6 @@
 from .kalshi_client import KalshiClient
 from .position_manager import PositionManager
-from .order_manager import OrderManager
-from .models import Side, Order
+from .models import Side
 from . import config
 from src.error.exceptions import AuthenticationError
 from dotenv import load_dotenv
@@ -25,7 +24,6 @@ class MarketMakerBot:
 
         self.client = KalshiClient(KEY_ID, KEY)
         self.position_manager = PositionManager(self.client)
-        self.order_manager = OrderManager(self.client, self.position_manager)
         logger.info("MarketMakerBot initialized successfully")
 
     async def __aenter__(self):
@@ -109,47 +107,26 @@ class MarketMakerBot:
         count: int,
         price_cents: int,
         ticker: str = None
-    ) -> Order:
-        """
-        Place a limit order.
-
-        Args:
-            action: "buy" or "sell"
-            side: "yes" or "no"
-            count: Number of contracts
-            price_cents: Limit price in cents
-            ticker: Market ticker (defaults to config.MARKET_TICKER)
-
-        Returns:
-            Order object
-        """
-        ticker = ticker or config.MARKET_TICKER
-        return await self.order_manager.place_order(
-            ticker=ticker,
-            action=action,
-            side=side,
-            count=count,
-            price_cents=price_cents
-        )
+    ):
+        """Place a limit order. TODO: Implement with new OrderManager."""
+        raise NotImplementedError("OrderManager not yet implemented")
 
     async def cancel_order(self, order_id: str) -> bool:
         """Cancel a specific order by ID."""
-        return await self.order_manager.cancel_order(order_id)
+        raise NotImplementedError("OrderManager not yet implemented")
 
     async def cancel_all_orders(self, ticker: str = None) -> int:
-        """Cancel all open orders. Returns count canceled."""
-        ticker = ticker or config.MARKET_TICKER
-        return await self.order_manager.cancel_all(ticker)
+        """Cancel all open orders."""
+        raise NotImplementedError("OrderManager not yet implemented")
 
-    async def get_open_orders(self, ticker: str = None) -> list[Order]:
+    async def get_open_orders(self, ticker: str = None) -> list:
         """Get open orders from API."""
-        ticker = ticker or config.MARKET_TICKER
-        return await self.order_manager.refresh_orders(ticker)
+        raise NotImplementedError("OrderManager not yet implemented")
 
     @property
-    def open_orders(self) -> list[Order]:
+    def open_orders(self) -> list:
         """Get locally tracked open orders."""
-        return self.order_manager.open_orders
+        raise NotImplementedError("OrderManager not yet implemented")
 
     # ========================================================================
     # MAIN TRADING LOOP
@@ -207,7 +184,7 @@ class MarketMakerBot:
 
 
 async def main():
-    """Manual testing of order management functions."""
+    """Demo: display account, position, and market info."""
     async with MarketMakerBot() as bot:
         # Balance is automatically loaded on startup
         print(f"Available Balance: ${bot.available_balance:.2f}")
@@ -232,93 +209,6 @@ async def main():
         print(f"\nOrderbook:")
         print(f"  YES side: {orderbook.get('yes', [])[:3]}")
         print(f"  NO side: {orderbook.get('no', [])[:3]}")
-
-        # ================================================================
-        # ORDER TESTING SEQUENCE
-        # ================================================================
-        print("\n" + "=" * 60)
-        print("ORDER MANAGEMENT TEST")
-        print("=" * 60)
-
-        # Test 1: Place a passive bid (won't fill - price too low)
-        print("\n[TEST 1] Placing passive bid: BUY 1 YES @ 10c...")
-        try:
-            order1 = await bot.place_order(
-                action="buy",
-                side="yes",
-                count=1,
-                price_cents=10
-            )
-            print(f"  Order placed: {order1.order_id}")
-            print(f"  Status: {order1.status.value}")
-            print(f"  Count: {order1.count}, Remaining: {order1.remaining_count}")
-        except Exception as e:
-            print(f"  FAILED: {e}")
-            return
-
-        # Test 2: Query open orders
-        print("\n[TEST 2] Querying open orders...")
-        # Debug: check raw API response WITHOUT status filter
-        raw_no_filter = await bot.client.get_orders()
-        print(f"  DEBUG (no filter): {len(raw_no_filter.get('orders', []))} orders")
-        for o in raw_no_filter.get('orders', [])[:5]:
-            print(f"    {o.get('order_id', 'no-id')[:8]}... status={o.get('status')} ticker={o.get('ticker', '')[:20]}")
-
-        # Debug: with resting filter
-        raw_resting = await bot.client.get_orders(status="resting")
-        print(f"  DEBUG (status=resting): {len(raw_resting.get('orders', []))} orders")
-
-        orders = await bot.get_open_orders()
-        print(f"  Found {len(orders)} open order(s)")
-        for o in orders:
-            print(f"    - {o.order_id}: {o.action.value} {o.count} {o.side.value} @ {o.price_cents}c")
-
-        # Test 3: Cancel by ID
-        print(f"\n[TEST 3] Canceling order {order1.order_id}...")
-        try:
-            canceled = await bot.cancel_order(order1.order_id)
-            print(f"  Canceled: {canceled}")
-        except Exception as e:
-            print(f"  FAILED: {e}")
-
-        # Test 4: Query again - should be empty
-        print("\n[TEST 4] Querying open orders (should be empty)...")
-        orders = await bot.get_open_orders()
-        print(f"  Found {len(orders)} open order(s)")
-
-        # Test 5: Place a passive ask (won't fill - price too high)
-        print("\n[TEST 5] Placing passive ask: SELL 1 YES @ 90c...")
-        try:
-            order2 = await bot.place_order(
-                action="sell",
-                side="yes",
-                count=1,
-                price_cents=90
-            )
-            print(f"  Order placed: {order2.order_id}")
-            print(f"  Status: {order2.status.value}")
-        except Exception as e:
-            print(f"  FAILED: {e}")
-            return
-
-        # Test 6: Cancel all orders
-        print("\n[TEST 6] Canceling ALL orders...")
-        try:
-            count = await bot.cancel_all_orders()
-            print(f"  Canceled {count} order(s)")
-        except Exception as e:
-            print(f"  FAILED: {e}")
-
-        # Test 7: Verify book is clean
-        print("\n[TEST 7] Verifying no open orders...")
-        orders = await bot.get_open_orders()
-        print(f"  Found {len(orders)} open order(s)")
-        if len(orders) == 0:
-            print("\n" + "=" * 60)
-            print("ALL TESTS PASSED!")
-            print("=" * 60)
-        else:
-            print("\n  WARNING: Orders still open!")
 
 
 if __name__ == "__main__":
