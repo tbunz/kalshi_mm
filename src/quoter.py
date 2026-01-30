@@ -337,7 +337,8 @@ class Quoter:
         best_bid: int,
         best_ask: int,
         size: int = None,
-        inventory_skew: int = 0
+        inventory_skew: int = 0,
+        reason: str = "requote"
     ) -> Tuple[Optional[str], Optional[str]]:
         """
         Cancel existing quotes and place new ones.
@@ -347,11 +348,12 @@ class Quoter:
             best_ask: Current market best ask
             size: Contract size per side
             inventory_skew: Position skew adjustment
+            reason: Why quotes are being updated (for logging)
 
         Returns:
             (bid_order_id, ask_order_id) from new quotes
         """
-        await self.cancel_quotes()
+        await self.cancel_quotes(reason=reason)
         return await self.place_quotes(best_bid, best_ask, size, inventory_skew)
 
     # ========================================================================

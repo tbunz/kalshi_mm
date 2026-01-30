@@ -338,13 +338,21 @@ class PositionManager:
         ticker = fill.ticker
         pos = self.get_position(ticker)
 
-        # Determine position change
-        # BUY YES or SELL NO = +position
-        # SELL YES or BUY NO = -position
+        logger.info(
+            f"Fill detected: {fill.action.value} {fill.count} @ {fill.yes_price}c | "
+            f"Position: {old_position} -> {new_position}"
+        )
+
+        # Determine position change based on action only
+        # BUY = going long = +position
+        # SELL = going short = -position
+        # Note: We ignore fill.side because Kalshi's internal book mechanics
+        # can return confusing side values (e.g., "sell YES" may return side=no
+        # because a YES ask is equivalent to a NO bid at complementary price)
         if fill.action == Action.BUY:
-            delta = fill.count if fill.side == Side.YES else -fill.count
+            delta = fill.count
         else:  # SELL
-            delta = -fill.count if fill.side == Side.YES else fill.count
+            delta = -fill.count
 
         old_position = pos.position
         new_position = old_position + delta
@@ -353,7 +361,7 @@ class PositionManager:
         if old_position == 0 or (old_position * delta > 0):
             # Opening or adding to position
             old_cost = abs(old_position) * pos.avg_entry_price
-            new_cost = fill.count * fill.price
+            new_cost = fill.count * fill.yes_price  # Always use yes_price for consistency
             total_contracts = abs(new_position)
             if total_contracts > 0:
                 pos.avg_entry_price = (old_cost + new_cost) / total_contracts

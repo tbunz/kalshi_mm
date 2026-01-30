@@ -290,7 +290,8 @@ class MarketMakerBot:
                             await self.quoter.update_quotes(
                                 best_bid=best_bid,
                                 best_ask=best_ask,
-                                inventory_skew=inventory_skew
+                                inventory_skew=inventory_skew,
+                                reason=reason
                             )
                     else:
                         # Market not active - cancel any existing quotes
