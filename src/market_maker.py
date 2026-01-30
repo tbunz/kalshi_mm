@@ -263,8 +263,10 @@ class MarketMakerBot:
 
                     # Only quote if market is active and has valid prices
                     if market_status == "active" and best_bid > 0 and best_ask > 0:
-                        # Check if we should requote
-                        should_update, reason = self.quoter.should_requote(best_bid, best_ask)
+                        # Check if we should requote (pass skew so calculation matches)
+                        should_update, reason = self.quoter.should_requote(
+                            best_bid, best_ask, inventory_skew
+                        )
 
                         # Log iteration summary
                         if self.quoter.has_active_quotes:

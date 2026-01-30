@@ -319,7 +319,7 @@ class LogPanel(Static):
         if not self._logs:
             content.append("No logs yet", style="dim italic")
         else:
-            for log in self._logs[-8:]:  # Last 8 logs
+            for log in self._logs[-14:]:  # Last 14 logs
                 time_str = log.get("time", "")
                 level = log.get("level", "INFO")
                 message = log.get("message", "")

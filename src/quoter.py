@@ -100,34 +100,40 @@ class Quoter:
 
         return bid_price, ask_price
 
-    def should_requote(self, best_bid: int, best_ask: int) -> Tuple[bool, str]:
+    def should_requote(
+        self,
+        best_bid: int,
+        best_ask: int,
+        inventory_skew: int = 0
+    ) -> Tuple[bool, str]:
         """
         Determine if quotes need to be refreshed.
 
         Args:
             best_bid: Current best bid in market
             best_ask: Current best ask in market
+            inventory_skew: Position skew adjustment (must match what place_quotes will use)
 
         Returns:
             (should_requote: bool, reason: str)
 
         Triggers:
         1. No active quotes
-        2. Market midpoint moved beyond REQUOTE_THRESHOLD
+        2. Calculated quotes differ from active quotes (handles rounding edge cases)
         3. Our quotes are crossed (bid >= ask) or through the market
         """
         # No quotes at all
         if not self.has_active_quotes:
             return True, "No active quotes"
 
-        # Calculate new midpoint
-        current_midpoint = (best_bid + best_ask) / 2
-
-        # Midpoint moved significantly
-        if self.state.last_midpoint is not None:
-            midpoint_change = abs(current_midpoint - self.state.last_midpoint)
-            if midpoint_change >= config.REQUOTE_THRESHOLD:
-                return True, f"Midpoint moved {midpoint_change:.1f}c"
+        # Check if calculated quotes differ from active quotes
+        new_bid, new_ask = self.calculate_quotes(best_bid, best_ask, inventory_skew)
+        if new_bid != self.state.bid_price or new_ask != self.state.ask_price:
+            mid = (best_bid + best_ask) / 2
+            return True, (
+                f"Quotes changed: {self.state.bid_price}/{self.state.ask_price} → {new_bid}/{new_ask} "
+                f"(mkt={best_bid}/{best_ask}, mid={mid:.1f}, skew={inventory_skew})"
+            )
 
         # Our bid is through the market (higher than best_bid = would be taken)
         if self.state.bid_price is not None and self.state.bid_price > best_bid:
