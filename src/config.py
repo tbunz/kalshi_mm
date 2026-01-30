@@ -6,8 +6,8 @@ Configuration and global settings for Kalshi Market Maker Bot
 # MARKET SELECTION
 # ============================================================================
 
-# Series ticker to trade (e.g., "INXD" for S&P 500 daily)
-SERIES_TICKER = "INXD"
+# Specific market ticker to trade
+MARKET_TICKER = "KXHIGHTSFO-26JAN29-B63.5"
 
 # ============================================================================
 # MARKET MAKER PARAMETERS
@@ -36,8 +36,8 @@ MAX_RUNTIME = 1800  # 30 minutes
 # API CONFIGURATION
 # ============================================================================
 
-# API base URL (usually don't need to change this)
-API_BASE_URL = "https://api.elections.kalshi.com/trade-api/v2"
+# API base URL (domain only, path added by client)
+API_BASE_URL = "https://api.elections.kalshi.com"
 
 # Whether to use demo/paper trading mode
 USE_DEMO_MODE = True
