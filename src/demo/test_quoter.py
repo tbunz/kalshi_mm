@@ -85,6 +85,107 @@ def test_quote_calculation():
     return True
 
 
+async def test_fill_callback():
+    """Test on_fill clears quote state - no network required."""
+    print("\n[UNIT] Testing fill callback...")
+
+    class MockBot:
+        pass
+
+    quoter = Quoter(MockBot(), ticker="TEST")
+
+    # Set up quote state with known order IDs
+    quoter.state = QuoteState(
+        bid_order_id="bid-order-123",
+        ask_order_id="ask-order-456",
+        bid_price=45,
+        ask_price=55,
+        last_midpoint=50.0
+    )
+
+    # Create a mock fill matching the bid order
+    class MockFill:
+        order_id = "bid-order-123"
+        count = 5
+        yes_price = 45
+
+    # Test 1: Fill on bid should clear bid state
+    assert quoter.state.bid_order_id is not None, "Setup: bid should be set"
+    await quoter.on_fill(MockFill())
+    assert quoter.state.bid_order_id is None, "Bid order_id should be cleared after fill"
+    assert quoter.state.bid_price is None, "Bid price should be cleared after fill"
+    assert quoter.state.ask_order_id == "ask-order-456", "Ask should be unchanged"
+    print("  Pass: Bid fill clears bid state, leaves ask")
+
+    # Test 2: Fill on ask should clear ask state
+    quoter.state = QuoteState(
+        bid_order_id="bid-order-789",
+        ask_order_id="ask-order-999",
+        bid_price=45,
+        ask_price=55,
+        last_midpoint=50.0
+    )
+
+    class MockAskFill:
+        order_id = "ask-order-999"
+        count = 3
+        yes_price = 55
+
+    await quoter.on_fill(MockAskFill())
+    assert quoter.state.ask_order_id is None, "Ask order_id should be cleared after fill"
+    assert quoter.state.ask_price is None, "Ask price should be cleared after fill"
+    assert quoter.state.bid_order_id == "bid-order-789", "Bid should be unchanged"
+    print("  Pass: Ask fill clears ask state, leaves bid")
+
+    # Test 3: Fill with unrelated order_id should not change state
+    quoter.state = QuoteState(
+        bid_order_id="bid-order-aaa",
+        ask_order_id="ask-order-bbb",
+        bid_price=45,
+        ask_price=55,
+        last_midpoint=50.0
+    )
+
+    class MockUnrelatedFill:
+        order_id = "some-other-order"
+        count = 10
+        yes_price = 50
+
+    await quoter.on_fill(MockUnrelatedFill())
+    assert quoter.state.bid_order_id == "bid-order-aaa", "Bid unchanged for unrelated fill"
+    assert quoter.state.ask_order_id == "ask-order-bbb", "Ask unchanged for unrelated fill"
+    print("  Pass: Unrelated fill leaves state unchanged")
+
+    # Test 4: After fill, should_requote should return True
+    quoter.state = QuoteState(
+        bid_order_id="bid-123",
+        ask_order_id="ask-456",
+        bid_price=45,
+        ask_price=55,
+        last_midpoint=50.0
+    )
+
+    # Both quotes active - should not requote
+    should, _ = quoter.should_requote(best_bid=45, best_ask=55)
+    assert not should, "Should not requote when both quotes active"
+
+    # Fill the bid
+    class MockBidFill:
+        order_id = "bid-123"
+        count = 1
+        yes_price = 45
+
+    await quoter.on_fill(MockBidFill())
+
+    # Now should requote (only one side active)
+    should, reason = quoter.should_requote(best_bid=45, best_ask=55)
+    assert should, "Should requote after fill (partial quotes)"
+    print(f"  Pass: After fill, should_requote=True ({reason})")
+
+    print("  [UNIT] All fill callback tests passed!")
+    return True
+
+
 def test_requote_logic():
     """Test should_requote logic - no network required."""
     print("\n[UNIT] Testing requote logic...")
@@ -219,6 +320,11 @@ async def run_quoter_tests(bot, bid_price: int, ask_price: int, nonstop: bool = 
         return False
 
     passed = test_requote_logic()
+    if not passed:
+        demo.footer(passed=False)
+        return False
+
+    passed = await test_fill_callback()
     if not passed:
         demo.footer(passed=False)
         return False

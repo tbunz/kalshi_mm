@@ -9,6 +9,7 @@ import logging
 
 if TYPE_CHECKING:
     from .market_maker import MarketMakerBot
+    from .models import Fill
 
 from . import config
 
@@ -344,3 +345,19 @@ class Quoter:
             "last_midpoint": self.state.last_midpoint,
             "has_active_quotes": self.has_active_quotes,
         }
+
+    async def on_fill(self, fill: "Fill") -> None:
+        """
+        Handle fill notification from PositionManager.
+
+        Clears quote state if the filled order was one of our quotes,
+        so should_requote() will trigger new quote placement.
+        """
+        if fill.order_id == self.state.bid_order_id:
+            logger.info(f"Bid quote filled: {fill.count} @ {fill.yes_price}c")
+            self.state.bid_order_id = None
+            self.state.bid_price = None
+        elif fill.order_id == self.state.ask_order_id:
+            logger.info(f"Ask quote filled: {fill.count} @ {fill.yes_price}c")
+            self.state.ask_order_id = None
+            self.state.ask_price = None

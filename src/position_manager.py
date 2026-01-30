@@ -4,7 +4,7 @@ Position and balance tracking for the market maker.
 import asyncio
 import logging
 from datetime import datetime
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Callable, Awaitable
 
 from .kalshi_client import KalshiClient
 from .models import MarketPosition, Fill, BalanceInfo, TrackedPosition, Side, Action
@@ -38,6 +38,19 @@ class PositionManager:
         # Sync state
         self._initialized: bool = False
         self._polling_task: Optional[asyncio.Task] = None
+
+        # Fill callbacks for notifying other components (e.g., Quoter)
+        self._fill_callbacks: List[Callable[[Fill], Awaitable[None]]] = []
+
+    def register_fill_callback(self, callback: Callable[[Fill], Awaitable[None]]) -> None:
+        """
+        Register an async callback to be invoked on new fills.
+
+        Args:
+            callback: Async function that takes a Fill object
+        """
+        self._fill_callbacks.append(callback)
+        logger.debug(f"Registered fill callback: {callback}")
 
     # ========================================================================
     # INITIALIZATION
@@ -302,7 +315,7 @@ class PositionManager:
                     break
 
                 new_fills.append(fill)
-                self._apply_fill(fill)
+                await self._apply_fill(fill)
 
             # Update tracking state
             if new_fills:
@@ -320,8 +333,8 @@ class PositionManager:
             logger.error(f"Error polling fills: {e}")
             return []
 
-    def _apply_fill(self, fill: Fill) -> None:
-        """Apply a fill to update position state"""
+    async def _apply_fill(self, fill: Fill) -> None:
+        """Apply a fill to update position state and notify callbacks."""
         ticker = fill.ticker
         pos = self.get_position(ticker)
 
@@ -355,6 +368,13 @@ class PositionManager:
             f"{old_position} -> {new_position} "
             f"(fill: {fill.action} {fill.count} {fill.side})"
         )
+
+        # Notify registered callbacks
+        for callback in self._fill_callbacks:
+            try:
+                await callback(fill)
+            except Exception as e:
+                logger.error(f"Fill callback error: {e}")
 
     # ========================================================================
     # BACKGROUND POLLING

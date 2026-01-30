@@ -37,6 +37,9 @@ class MarketMakerBot:
         # Initialize position manager on startup
         await self.position_manager.initialize()
 
+        # Register quoter to receive fill notifications
+        self.position_manager.register_fill_callback(self.quoter.on_fill)
+
         # Start background fill polling
         await self.position_manager.start_polling()
 
