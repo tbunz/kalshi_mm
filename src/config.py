@@ -7,7 +7,7 @@ Configuration and global settings for Kalshi Market Maker Bot
 # ============================================================================
 
 # Specific market ticker to trade
-MARKET_TICKER = "KXPRESNOMD-28-GN"
+MARKET_TICKER = "KXHIGHLAX-26JAN30-B81.5"
 
 # ============================================================================
 # MARKET MAKER PARAMETERS
@@ -24,17 +24,17 @@ MAX_TOTAL_EXPOSURE = 2
 # ============================================================================
 
 # Total spread width in cents (our bid at mid - SPREAD_WIDTH/2, ask at mid + SPREAD_WIDTH/2)
-SPREAD_WIDTH = 14
+SPREAD_WIDTH = 2
 
 # Number of contracts per quote side
 QUOTE_SIZE = 1
 
 # Requote when midpoint moves by this many cents
-REQUOTE_THRESHOLD = 2
+REQUOTE_THRESHOLD = 1
 
 # Cents to skew quotes per contract of inventory
 # Positive inventory (long YES) -> positive skew -> lower bid/ask to encourage selling
-INVENTORY_SKEW_PER_CONTRACT = 1
+INVENTORY_SKEW_PER_CONTRACT = 0
 
 # ============================================================================
 # LOOP CONTROL
@@ -44,7 +44,7 @@ INVENTORY_SKEW_PER_CONTRACT = 1
 LOOP_INTERVAL = 5
 
 # Maximum runtime (seconds) - for testing
-MAX_RUNTIME = 120
+MAX_RUNTIME = 1000
 
 # ============================================================================
 # API CONFIGURATION

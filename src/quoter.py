@@ -93,9 +93,10 @@ class Quoter:
         bid_price = max(1, min(99, bid_price))
         ask_price = max(1, min(99, ask_price))
 
-        # Safety: never cross the market
-        bid_price = min(bid_price, best_bid)
-        ask_price = max(ask_price, best_ask)
+        # Safety: never cross ourselves (bid must be < ask)
+        if bid_price >= ask_price:
+            bid_price = int(midpoint) - 1
+            ask_price = int(midpoint) + 1
 
         return bid_price, ask_price
 
@@ -236,22 +237,32 @@ class Quoter:
             except Exception as e:
                 logger.error(f"Failed to place ask: {e}")
 
-        # Cancel lone order if only one side succeeded (avoid one-sided exposure)
+        # Cancel lone order only if it adds risk (not if it reduces position)
+        position = self.bot.get_position(self.ticker).position
+
         if bid_order_id and not ask_order_id:
-            logger.warning("Partial placement - canceling lone bid to avoid one-sided exposure")
-            try:
-                await self.bot.cancel_order(bid_order_id)
-                bid_order_id = None
-            except Exception as e:
-                logger.error(f"Failed to cancel lone bid: {e}")
+            # Lone bid is OK if we're short (reduces risk), bad if flat or long
+            if position >= 0:
+                logger.warning("Partial placement - canceling lone bid to avoid one-sided exposure")
+                try:
+                    await self.bot.cancel_order(bid_order_id)
+                    bid_order_id = None
+                except Exception as e:
+                    logger.error(f"Failed to cancel lone bid: {e}")
+            else:
+                logger.info(f"Allowing lone bid to reduce short position ({position})")
 
         elif ask_order_id and not bid_order_id:
-            logger.warning("Partial placement - canceling lone ask to avoid one-sided exposure")
-            try:
-                await self.bot.cancel_order(ask_order_id)
-                ask_order_id = None
-            except Exception as e:
-                logger.error(f"Failed to cancel lone ask: {e}")
+            # Lone ask is OK if we're long (reduces risk), bad if flat or short
+            if position <= 0:
+                logger.warning("Partial placement - canceling lone ask to avoid one-sided exposure")
+                try:
+                    await self.bot.cancel_order(ask_order_id)
+                    ask_order_id = None
+                except Exception as e:
+                    logger.error(f"Failed to cancel lone ask: {e}")
+            else:
+                logger.info(f"Allowing lone ask to reduce long position ({position})")
 
         # Log successful placement with order IDs
         if bid_order_id and ask_order_id:
