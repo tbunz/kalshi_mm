@@ -204,6 +204,15 @@ class PositionManager:
         new_position = current_pos.position + delta
         new_contracts = abs(new_position)
 
+        # Allow risk-reducing orders that move position toward zero
+        if current_pos.position > 0 and side == Side.NO:  # Selling YES / buying NO
+            if new_contracts < abs(current_pos.position):
+                return (True, "Risk-reducing order allowed")
+
+        if current_pos.position < 0 and side == Side.YES:  # Buying YES to cover short
+            if new_contracts < abs(current_pos.position):
+                return (True, "Risk-reducing order allowed")
+
         # Check 1: Max position size per market
         if new_contracts > config.MAX_POSITION_SIZE:
             return (
@@ -338,11 +347,6 @@ class PositionManager:
         ticker = fill.ticker
         pos = self.get_position(ticker)
 
-        logger.info(
-            f"Fill detected: {fill.action.value} {fill.count} @ {fill.yes_price}c | "
-            f"Position: {old_position} -> {new_position}"
-        )
-
         # Determine position change based on action only
         # BUY = going long = +position
         # SELL = going short = -position
@@ -357,7 +361,7 @@ class PositionManager:
         old_position = pos.position
         new_position = old_position + delta
 
-        # Update average price (simplified - for new or adding to position)
+        # Update average price and track realized P&L
         if old_position == 0 or (old_position * delta > 0):
             # Opening or adding to position
             old_cost = abs(old_position) * pos.avg_entry_price
@@ -365,15 +369,23 @@ class PositionManager:
             total_contracts = abs(new_position)
             if total_contracts > 0:
                 pos.avg_entry_price = (old_cost + new_cost) / total_contracts
-        # Else: reducing/closing position - avg_entry_price stays same
+        else:
+            # Reducing/closing position - calculate realized P&L
+            contracts_closed = min(abs(old_position), abs(delta))
+            if old_position > 0:  # Was long YES, now selling
+                realized = (fill.yes_price - pos.avg_entry_price) * contracts_closed
+            else:  # Was short (long NO), now buying back
+                realized = (pos.avg_entry_price - fill.yes_price) * contracts_closed
+            pos.realized_pnl_cents += int(realized)
+            logger.info(f"Realized P&L: {int(realized)}c on {contracts_closed} contracts")
 
         pos.position = new_position
         pos.last_fill_id = fill.fill_id
         pos.last_updated = datetime.utcnow()
 
-        # Log fill with full details for audit
+        # Log fill with yes_price only (ignore side - Kalshi returns counterparty perspective)
         logger.info(
-            f"Fill detected: {fill.action.value} {fill.count} {fill.side.value} @ {fill.price}c | "
+            f"Fill: {fill.action.value} {fill.count} @ {fill.yes_price}c | "
             f"Position: {old_position} -> {new_position}"
         )
 

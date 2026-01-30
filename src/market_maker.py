@@ -55,7 +55,7 @@ class MarketMakerBot:
         return self
 
     async def _on_fill_for_ui(self, fill: Fill) -> None:
-        """Track fills for UI display."""
+        """Track fills for UI display and check for large fill kill switch."""
         fill_data = {
             "time": fill.created_time.strftime("%H:%M:%S") if fill.created_time else "",
             "action": fill.action.value if fill.action else "",
@@ -68,6 +68,16 @@ class MarketMakerBot:
         # Keep only last 20 fills
         if len(self._recent_fills) > 20:
             self._recent_fills = self._recent_fills[-20:]
+
+        # Kill switch on unexpected large fill
+        if fill.count >= config.KILL_SWITCH_LARGE_FILL_THRESHOLD:
+            logger.critical(
+                f"KILL SWITCH: Large fill detected ({fill.count} contracts) - canceling all orders"
+            )
+            try:
+                await self.quoter.cancel_quotes(force_clear=True, reason="large_fill")
+            except Exception as e:
+                logger.error(f"Kill switch cancel failed: {e}")
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit - ensures cleanup"""
@@ -231,6 +241,7 @@ class MarketMakerBot:
         """
         start_time = time.time()
         iteration = 0
+        consecutive_errors = 0
 
         logger.info(
             f"Starting trading loop | "
@@ -336,8 +347,23 @@ class MarketMakerBot:
                             "logs": recent_logs,
                         })
 
+                    # Reset error counter on successful iteration
+                    consecutive_errors = 0
+
                 except Exception as e:
-                    logger.error(f"Loop iteration {iteration} error: {e}")
+                    consecutive_errors += 1
+                    logger.error(f"Loop iteration {iteration} error ({consecutive_errors}x): {e}")
+
+                    # Kill switch on connectivity loss
+                    if consecutive_errors >= config.KILL_SWITCH_ERROR_THRESHOLD:
+                        logger.critical(
+                            f"KILL SWITCH: {consecutive_errors} consecutive errors - canceling all orders"
+                        )
+                        try:
+                            await self.quoter.cancel_quotes(force_clear=True, reason="connectivity_loss")
+                        except Exception as cancel_err:
+                            logger.error(f"Kill switch cancel failed: {cancel_err}")
+
                     if update_callback:
                         await update_callback({"error": str(e)})
 

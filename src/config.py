@@ -34,7 +34,7 @@ REQUOTE_THRESHOLD = 1
 
 # Cents to skew quotes per contract of inventory
 # Positive inventory (long YES) -> positive skew -> lower bid/ask to encourage selling
-INVENTORY_SKEW_PER_CONTRACT = 0
+INVENTORY_SKEW_PER_CONTRACT = 1
 
 # ============================================================================
 # LOOP CONTROL
@@ -62,6 +62,16 @@ FILL_POLL_INTERVAL = 2
 
 # Maximum fills to fetch per poll request
 FILL_POLL_LIMIT = 50
+
+# ============================================================================
+# KILL SWITCH SETTINGS
+# ============================================================================
+
+# Cancel all orders after this many consecutive API errors
+KILL_SWITCH_ERROR_THRESHOLD = 3
+
+# Cancel all orders if a single fill exceeds this many contracts
+KILL_SWITCH_LARGE_FILL_THRESHOLD = 5
 
 # ============================================================================
 # LOGGING CONFIGURATION

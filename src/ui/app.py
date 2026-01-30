@@ -91,6 +91,7 @@ class MarketMakerApp(App):
         Binding("q", "quit", "Quit", show=True),
         Binding("ctrl+c", "quit", "Quit", show=False),
         Binding("r", "refresh", "Refresh", show=True),
+        Binding("k", "kill_switch", "Kill All", show=True),
     ]
 
     def __init__(self):
@@ -253,6 +254,16 @@ class MarketMakerApp(App):
     def action_refresh(self) -> None:
         """Manual refresh action"""
         self.notify("Refreshing...")
+
+    async def action_kill_switch(self) -> None:
+        """Emergency kill switch - cancel all orders"""
+        self.notify("KILL SWITCH - Canceling all orders...", severity="warning")
+        if self.bot:
+            try:
+                await self.bot.quoter.cancel_quotes(force_clear=True, reason="kill_switch")
+                self.notify("All orders canceled", severity="information")
+            except Exception as e:
+                self.notify(f"Kill switch error: {e}", severity="error")
 
     async def action_quit(self) -> None:
         """Quit the application"""
