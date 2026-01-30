@@ -2,7 +2,7 @@
 from .runner import DemoRunner
 
 
-async def run_order_tests(bot, nonstop: bool = False):
+async def run_order_tests(bot, bid_price: int, ask_price: int, nonstop: bool = False):
     """
     Interactive order management tests.
 
@@ -20,9 +20,9 @@ async def run_order_tests(bot, nonstop: bool = False):
 
     # Test 1: Place bid
     order_id = await demo.step(
-        "Place passive bid: BUY 1 YES @ 10c",
+        f"Place passive bid: BUY 1 YES @ {bid_price}c",
         bot.place_order,
-        action="buy", side="yes", count=1, price_cents=10
+        action="buy", side="yes", count=1, price_cents=bid_price
     )
     demo.show(f"Order ID: {order_id}")
 
@@ -52,9 +52,9 @@ async def run_order_tests(bot, nonstop: bool = False):
 
     # Test 5: Place ask
     order_id2 = await demo.step(
-        "Place passive ask: SELL 1 YES @ 90c",
+        f"Place passive ask: SELL 1 YES @ {ask_price}c",
         bot.place_order,
-        action="sell", side="yes", count=1, price_cents=90
+        action="sell", side="yes", count=1, price_cents=ask_price
     )
     demo.show(f"Order ID: {order_id2}")
     demo.show("NOTE: If this fills, position goes to -1 (short YES)")

@@ -216,7 +216,7 @@ class MarketMakerBot:
         logger.info(f"Trading loop finished after {iteration} iterations")
 
 
-async def main(nonstop: bool = False):
+async def main(bid_price: int, ask_price: int, nonstop: bool = False):
     """Run interactive demo tests."""
     from src.demo import run_order_tests
 
@@ -231,7 +231,7 @@ async def main(nonstop: bool = False):
         print(f"Market: {market['ticker']} - Yes: {market['yes_bid']}/{market['yes_ask']}c")
 
         # Run order tests
-        await run_order_tests(bot, nonstop=nonstop)
+        await run_order_tests(bot, bid_price=bid_price, ask_price=ask_price, nonstop=nonstop)
 
 
 if __name__ == "__main__":
