@@ -17,6 +17,19 @@ class Action(str, Enum):
     SELL = "sell"
 
 
+class OrderStatus(str, Enum):
+    PENDING = "pending"
+    OPEN = "open"
+    FILLED = "filled"
+    CANCELED = "canceled"
+    REJECTED = "rejected"
+
+
+class OrderType(str, Enum):
+    LIMIT = "limit"
+    MARKET = "market"
+
+
 # ============================================================================
 # API RESPONSE MODELS
 # ============================================================================
@@ -81,6 +94,34 @@ class BalanceInfo(BaseModel):
     def total_equity_dollars(self) -> float:
         """Total account equity (balance + positions)"""
         return (self.balance + self.portfolio_value) / 100
+
+
+class Order(BaseModel):
+    """An order (from Kalshi API or local tracking)"""
+    order_id: str
+    ticker: str
+    action: Action
+    side: Side
+    type: OrderType = OrderType.LIMIT
+    price_cents: int  # Limit price
+    count: int  # Contracts requested
+    remaining_count: int = 0  # Contracts still open
+    status: OrderStatus = OrderStatus.OPEN
+    created_time: Optional[datetime] = None
+
+    @property
+    def filled_count(self) -> int:
+        """Number of contracts filled"""
+        return self.count - self.remaining_count
+
+    @property
+    def is_open(self) -> bool:
+        return self.status == OrderStatus.OPEN
+
+    @property
+    def cost_cents(self) -> int:
+        """Cost to place this order (margin required)"""
+        return self.count * self.price_cents
 
 
 # ============================================================================

@@ -71,12 +71,13 @@ class KalshiClient:
             resp.raise_for_status()
             return await resp.json()
 
-    async def delete(self, path: str) -> dict:
+    async def delete(self, path: str, params: dict = None, data: dict = None) -> dict:
         """Make authenticated DELETE request"""
         full_path = f"{self.API_PREFIX}{path}"
+        # Signature is on path only, not query params
         headers = self._headers("DELETE", full_path)
         url = f"{self.base_url}{full_path}"
-        async with self.session.delete(url, headers=headers) as resp:
+        async with self.session.delete(url, headers=headers, params=params, json=data) as resp:
             resp.raise_for_status()
             return await resp.json()
 
@@ -151,3 +152,93 @@ class KalshiClient:
         if cursor:
             params['cursor'] = cursor
         return await self.get("/portfolio/fills", params or None)
+
+    # ========================================================================
+    # ORDER MANAGEMENT
+    # ========================================================================
+
+    async def place_order(
+        self,
+        ticker: str,
+        action: str,
+        side: str,
+        count: int,
+        price_cents: int,
+        order_type: str = "limit",
+        client_order_id: str = None
+    ) -> dict:
+        """
+        Place an order.
+
+        Args:
+            ticker: Market ticker
+            action: "buy" or "sell"
+            side: "yes" or "no"
+            count: Number of contracts
+            price_cents: Limit price in cents (1-99)
+            order_type: "limit" or "market"
+            client_order_id: Optional client-provided ID
+
+        Returns:
+            Order response with order_id
+        """
+        data = {
+            "ticker": ticker,
+            "action": action,
+            "side": side,
+            "count": count,
+            "type": order_type,
+        }
+        # Only include price for limit orders
+        if order_type == "limit":
+            if side == "yes":
+                data["yes_price"] = price_cents
+            else:
+                data["no_price"] = price_cents
+        if client_order_id:
+            data["client_order_id"] = client_order_id
+        return await self.post("/portfolio/orders", data)
+
+    async def cancel_order(self, order_id: str) -> dict:
+        """Cancel a specific order by ID."""
+        return await self.delete(f"/portfolio/orders/{order_id}")
+
+    async def batch_cancel_orders(self, order_ids: list[str]) -> dict:
+        """
+        Cancel multiple orders at once (up to 20).
+
+        Args:
+            order_ids: List of order IDs to cancel
+        """
+        return await self.delete("/portfolio/orders/batched", data={"ids": order_ids})
+
+    async def get_orders(
+        self,
+        ticker: str = None,
+        status: str = None,
+        limit: int = 100,
+        cursor: str = None
+    ) -> dict:
+        """
+        Get orders.
+
+        Args:
+            ticker: Filter by market ticker
+            status: Filter by status (e.g., "open", "filled", "canceled")
+            limit: Number of results
+            cursor: Pagination cursor
+        """
+        params = {}
+        if ticker:
+            params['ticker'] = ticker
+        if status:
+            params['status'] = status
+        if limit != 100:
+            params['limit'] = limit
+        if cursor:
+            params['cursor'] = cursor
+        return await self.get("/portfolio/orders", params or None)
+
+    async def get_order(self, order_id: str) -> dict:
+        """Get a specific order by ID."""
+        return await self.get(f"/portfolio/orders/{order_id}")
