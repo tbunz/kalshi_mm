@@ -363,10 +363,10 @@ class PositionManager:
         pos.last_fill_id = fill.fill_id
         pos.last_updated = datetime.utcnow()
 
-        logger.debug(
-            f"Position updated: {ticker} "
-            f"{old_position} -> {new_position} "
-            f"(fill: {fill.action} {fill.count} {fill.side})"
+        # Log fill with full details for audit
+        logger.info(
+            f"Fill detected: {fill.action.value} {fill.count} {fill.side.value} @ {fill.price}c | "
+            f"Position: {old_position} -> {new_position}"
         )
 
         # Notify registered callbacks

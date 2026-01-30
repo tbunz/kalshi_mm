@@ -4,6 +4,8 @@ Main entry point for Kalshi Market Maker
 import sys
 import asyncio
 
+from src.logging_config import setup_logging
+
 
 def run_ui():
     """Run the terminal UI"""
@@ -19,6 +21,9 @@ def run_demo(bid_price: int, ask_price: int, nonstop: bool = False):
 
 
 if __name__ == "__main__":
+    # Initialize logging before anything else
+    setup_logging()
+
     if "--demo" in sys.argv:
         # Parse: python main.py --demo <bid> <ask> [--nonstop]
         demo_idx = sys.argv.index("--demo")

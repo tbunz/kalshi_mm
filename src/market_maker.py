@@ -208,7 +208,14 @@ class MarketMakerBot:
         start_time = time.time()
         iteration = 0
 
-        logger.info(f"Starting trading loop (max runtime: {config.MAX_RUNTIME}s)")
+        logger.info(
+            f"Starting trading loop | "
+            f"ticker={config.MARKET_TICKER} | "
+            f"spread={config.SPREAD_WIDTH}c | "
+            f"size={config.QUOTE_SIZE} | "
+            f"requote_threshold={config.REQUOTE_THRESHOLD}c | "
+            f"max_runtime={config.MAX_RUNTIME}s"
+        )
 
         try:
             while time.time() - start_time < config.MAX_RUNTIME:
@@ -235,8 +242,25 @@ class MarketMakerBot:
                         # Check if we should requote
                         should_update, reason = self.quoter.should_requote(best_bid, best_ask)
 
+                        # Log iteration summary
+                        if self.quoter.has_active_quotes:
+                            quote_status = f"{self.quoter.state.bid_price}/{self.quoter.state.ask_price} (resting)"
+                        elif self.quoter.has_any_quotes:
+                            # One side only (partial)
+                            bid_str = str(self.quoter.state.bid_price) if self.quoter.state.bid_price else "-"
+                            ask_str = str(self.quoter.state.ask_price) if self.quoter.state.ask_price else "-"
+                            quote_status = f"{bid_str}/{ask_str} (partial)"
+                        else:
+                            quote_status = "none"
+
+                        requote_str = f"Yes ({reason})" if should_update else "No"
+                        logger.info(
+                            f"Market: {best_bid}/{best_ask} | "
+                            f"Quotes: {quote_status} | "
+                            f"Requote: {requote_str}"
+                        )
+
                         if should_update:
-                            logger.info(f"Requoting: {reason}")
                             await self.quoter.update_quotes(
                                 best_bid=best_bid,
                                 best_ask=best_ask,
@@ -272,13 +296,20 @@ class MarketMakerBot:
 
         finally:
             # Graceful shutdown: cancel all quotes
-            logger.info("Shutting down - canceling quotes")
+            elapsed_total = time.time() - start_time
+            logger.info(f"Shutting down after {elapsed_total:.1f}s ({iteration} iterations)")
             try:
-                await self.quoter.cancel_quotes(force_clear=True)
+                await self.quoter.cancel_quotes(force_clear=True, reason="shutdown")
             except Exception as e:
                 logger.error(f"Error canceling quotes on shutdown: {e}")
 
-        logger.info(f"Trading loop finished after {iteration} iterations")
+            # Log final position
+            final_pos = self.get_position()
+            logger.info(
+                f"Final state | "
+                f"position={final_pos.position} | "
+                f"balance=${self.available_balance:.2f}"
+            )
 
 
 async def main(bid_price: int, ask_price: int, nonstop: bool = False):

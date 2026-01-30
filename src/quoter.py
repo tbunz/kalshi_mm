@@ -185,10 +185,8 @@ class Quoter:
         size = size or config.QUOTE_SIZE
         bid_price, ask_price = self.calculate_quotes(best_bid, best_ask, inventory_skew)
 
-        logger.info(
-            f"Placing quotes: bid={bid_price}c, ask={ask_price}c, "
-            f"size={size}, market={best_bid}/{best_ask}"
-        )
+        # Log placement intent
+        logger.info(f"Placing: bid={bid_price}c, ask={ask_price}c, size={size}")
 
         bid_order_id = None
         ask_order_id = None
@@ -212,7 +210,6 @@ class Quoter:
                     price_cents=bid_price,
                     ticker=self.ticker
                 )
-                logger.info(f"Bid placed: {bid_order_id} @ {bid_price}c")
             except Exception as e:
                 logger.error(f"Failed to place bid: {e}")
 
@@ -236,7 +233,6 @@ class Quoter:
                     price_cents=ask_price,
                     ticker=self.ticker
                 )
-                logger.info(f"Ask placed: {ask_order_id} @ {ask_price}c")
             except Exception as e:
                 logger.error(f"Failed to place ask: {e}")
 
@@ -257,6 +253,12 @@ class Quoter:
             except Exception as e:
                 logger.error(f"Failed to cancel lone ask: {e}")
 
+        # Log successful placement with order IDs
+        if bid_order_id and ask_order_id:
+            logger.info(f"Placed: bid={bid_order_id}, ask={ask_order_id}")
+        elif bid_order_id or ask_order_id:
+            logger.warning(f"Partial placed: bid={bid_order_id}, ask={ask_order_id}")
+
         # Update state
         midpoint = (best_bid + best_ask) / 2
         self.state = QuoteState(
@@ -269,13 +271,14 @@ class Quoter:
 
         return bid_order_id, ask_order_id
 
-    async def cancel_quotes(self, force_clear: bool = False) -> int:
+    async def cancel_quotes(self, force_clear: bool = False, reason: str = "requote") -> int:
         """
         Cancel all active quotes.
 
         Args:
             force_clear: If True, clear state even on cancel failure (use when
                         you know orders are gone, e.g., market closed)
+            reason: Why quotes are being canceled (for logging)
 
         Returns:
             Number of orders canceled
@@ -290,10 +293,13 @@ class Quoter:
             order_ids.append(self.state.ask_order_id)
 
         if not order_ids:
-            logger.info("No quotes to cancel")
             return 0
 
-        logger.info(f"Canceling {len(order_ids)} quote(s)")
+        # Log with order IDs for audit trail
+        logger.info(
+            f"Canceling: bid={self.state.bid_order_id}, ask={self.state.ask_order_id} | "
+            f"reason={reason}"
+        )
 
         try:
             count = await self.bot.cancel_all_orders(order_ids=order_ids)
@@ -354,10 +360,16 @@ class Quoter:
         so should_requote() will trigger new quote placement.
         """
         if fill.order_id == self.state.bid_order_id:
-            logger.info(f"Bid quote filled: {fill.count} @ {fill.yes_price}c")
+            logger.info(
+                f"Quote filled: BID {fill.count}@{fill.yes_price}c | "
+                f"order={fill.order_id}"
+            )
             self.state.bid_order_id = None
             self.state.bid_price = None
         elif fill.order_id == self.state.ask_order_id:
-            logger.info(f"Ask quote filled: {fill.count} @ {fill.yes_price}c")
+            logger.info(
+                f"Quote filled: ASK {fill.count}@{fill.yes_price}c | "
+                f"order={fill.order_id}"
+            )
             self.state.ask_order_id = None
             self.state.ask_price = None

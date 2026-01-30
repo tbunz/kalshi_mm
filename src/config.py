@@ -62,3 +62,22 @@ FILL_POLL_INTERVAL = 2
 
 # Maximum fills to fetch per poll request
 FILL_POLL_LIMIT = 50
+
+# ============================================================================
+# LOGGING CONFIGURATION
+# ============================================================================
+
+# Directory for log files (relative to project root)
+LOG_DIR = "logs"
+
+# Log file name
+LOG_FILE = "trading.log"
+
+# Logging level (DEBUG, INFO, WARNING, ERROR)
+LOG_LEVEL = "INFO"
+
+# Max log file size before rotation (5 MB)
+LOG_MAX_BYTES = 5 * 1024 * 1024
+
+# Number of backup log files to keep
+LOG_BACKUP_COUNT = 5
