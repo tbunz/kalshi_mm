@@ -66,13 +66,17 @@ class TradingFormatter(logging.Formatter):
         return f"{timestamp} | {record.getMessage()}"
 
 
-def setup_logging() -> None:
+def setup_logging(use_console: bool = True) -> None:
     """
     Configure logging for the trading application.
 
     Sets up:
-    - Console handler with trading formatter
+    - Console handler with trading formatter (optional, disable for UI mode)
     - Rotating file handler for persistent logs
+
+    Args:
+        use_console: If True, logs to stdout. Set to False when running with
+                     the Textual UI to prevent log output corrupting the display.
     """
     # Create logs directory if it doesn't exist
     log_dir = Path(config.LOG_DIR)
@@ -83,11 +87,6 @@ def setup_logging() -> None:
 
     # Create formatter
     formatter = TradingFormatter()
-
-    # Console handler
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    console_handler.setLevel(log_level)
 
     # File handler with rotation
     file_handler = RotatingFileHandler(
@@ -105,8 +104,13 @@ def setup_logging() -> None:
     # Remove any existing handlers to avoid duplicates
     root_logger.handlers.clear()
 
-    # Add handlers
-    root_logger.addHandler(console_handler)
+    # Console handler (skip when UI is active to prevent display corruption)
+    if use_console:
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        console_handler.setLevel(log_level)
+        root_logger.addHandler(console_handler)
+
     root_logger.addHandler(file_handler)
 
     # UI handler for live display

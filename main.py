@@ -21,9 +21,6 @@ def run_demo(bid_price: int, ask_price: int, nonstop: bool = False):
 
 
 if __name__ == "__main__":
-    # Initialize logging before anything else
-    setup_logging()
-
     if "--demo" in sys.argv:
         # Parse: python main.py --demo <bid> <ask> [--nonstop]
         demo_idx = sys.argv.index("--demo")
@@ -36,7 +33,9 @@ if __name__ == "__main__":
             sys.exit(1)
 
         nonstop = "--nonstop" in sys.argv
+        setup_logging(use_console=True)  # Console OK in demo mode
         print(f"Running in demo mode (bid={bid_price}, ask={ask_price}, nonstop={nonstop})...")
         run_demo(bid_price=bid_price, ask_price=ask_price, nonstop=nonstop)
     else:
+        setup_logging(use_console=False)  # No console - UI handles display
         run_ui()
