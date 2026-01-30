@@ -1,5 +1,6 @@
 from .kalshi_client import KalshiClient
 from .position_manager import PositionManager
+from .order_manager import OrderManager
 from .models import Side
 from . import config
 from src.error.exceptions import AuthenticationError
@@ -24,6 +25,7 @@ class MarketMakerBot:
 
         self.client = KalshiClient(KEY_ID, KEY)
         self.position_manager = PositionManager(self.client)
+        self.order_manager = OrderManager(self.client)
         logger.info("MarketMakerBot initialized successfully")
 
     async def __aenter__(self):
@@ -107,26 +109,57 @@ class MarketMakerBot:
         count: int,
         price_cents: int,
         ticker: str = None
-    ):
-        """Place a limit order. TODO: Implement with new OrderManager."""
-        raise NotImplementedError("OrderManager not yet implemented")
+    ) -> str:
+        """
+        Place a limit order.
+
+        Args:
+            action: "buy" or "sell"
+            side: "yes" or "no"
+            count: Number of contracts
+            price_cents: Limit price in cents (1-99)
+            ticker: Market ticker (defaults to config.MARKET_TICKER)
+
+        Returns:
+            order_id string
+        """
+        ticker = ticker or config.MARKET_TICKER
+        return await self.order_manager.place_order(
+            ticker=ticker,
+            action=action,
+            side=side,
+            price=price_cents,
+            size=count
+        )
 
     async def cancel_order(self, order_id: str) -> bool:
         """Cancel a specific order by ID."""
-        raise NotImplementedError("OrderManager not yet implemented")
+        return await self.order_manager.cancel_order(order_id)
 
-    async def cancel_all_orders(self, ticker: str = None) -> int:
-        """Cancel all open orders."""
-        raise NotImplementedError("OrderManager not yet implemented")
+    async def cancel_all_orders(self, order_ids: list[str] = None, ticker: str = None) -> int:
+        """
+        Cancel orders. Pass order_ids if known, otherwise queries API (best effort).
 
-    async def get_open_orders(self, ticker: str = None) -> list:
+        Args:
+            order_ids: List of order IDs to cancel (preferred)
+            ticker: Fallback - query API for this ticker's orders
+
+        Returns:
+            Count canceled
+        """
+        if order_ids is None:
+            # Best effort: query API (may miss orders due to eventual consistency)
+            ticker = ticker or config.MARKET_TICKER
+            response = await self.client.get_orders(ticker=ticker, status="resting")
+            order_ids = [o["order_id"] for o in response.get("orders", [])]
+
+        return await self.order_manager.cancel_all(order_ids)
+
+    async def get_open_orders(self, ticker: str = None) -> list[dict]:
         """Get open orders from API."""
-        raise NotImplementedError("OrderManager not yet implemented")
-
-    @property
-    def open_orders(self) -> list:
-        """Get locally tracked open orders."""
-        raise NotImplementedError("OrderManager not yet implemented")
+        ticker = ticker or config.MARKET_TICKER
+        response = await self.client.get_orders(ticker=ticker, status="resting")
+        return response.get("orders", [])
 
     # ========================================================================
     # MAIN TRADING LOOP
@@ -184,31 +217,21 @@ class MarketMakerBot:
 
 
 async def main():
-    """Demo: display account, position, and market info."""
+    """Run interactive demo tests."""
+    from src.demo import run_order_tests
+
     async with MarketMakerBot() as bot:
-        # Balance is automatically loaded on startup
-        print(f"Available Balance: ${bot.available_balance:.2f}")
+        # Show account info
+        print(f"Balance: ${bot.available_balance:.2f}")
 
-        # Get current position
         pos = bot.get_position()
-        print(f"\nPosition in {config.MARKET_TICKER}:")
-        print(f"  Net: {pos.position} ({pos.side.value if pos.side else 'flat'})")
-        print(f"  Contracts: {pos.contracts}")
-        print(f"  Exposure: ${pos.exposure_cents / 100:.2f}")
+        print(f"Position: {pos.position} ({pos.side.value if pos.side else 'flat'})")
 
-        # Get market info
         market = await bot.get_market()
-        print(f"\nMarket: {market['ticker']}")
-        print(f"  Status: {market['status']}")
-        print(f"  Yes Bid: {market['yes_bid']}c")
-        print(f"  Yes Ask: {market['yes_ask']}c")
-        print(f"  Volume: {market['volume']}")
+        print(f"Market: {market['ticker']} - Yes: {market['yes_bid']}/{market['yes_ask']}c")
 
-        # Get orderbook
-        orderbook = await bot.get_orderbook(depth=5)
-        print(f"\nOrderbook:")
-        print(f"  YES side: {orderbook.get('yes', [])[:3]}")
-        print(f"  NO side: {orderbook.get('no', [])[:3]}")
+        # Run order tests
+        await run_order_tests(bot)
 
 
 if __name__ == "__main__":
