@@ -32,6 +32,10 @@ QUOTE_SIZE = 5
 # Requote when midpoint moves by this many cents
 REQUOTE_THRESHOLD = 2
 
+# Cents to skew quotes per contract of inventory
+# Positive inventory (long YES) -> positive skew -> lower bid/ask to encourage selling
+INVENTORY_SKEW_PER_CONTRACT = 1
+
 # ============================================================================
 # LOOP CONTROL
 # ============================================================================

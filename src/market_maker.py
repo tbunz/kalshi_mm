@@ -207,40 +207,73 @@ class MarketMakerBot:
 
         logger.info(f"Starting trading loop (max runtime: {config.MAX_RUNTIME}s)")
 
-        while time.time() - start_time < config.MAX_RUNTIME:
-            iteration += 1
-            elapsed = time.time() - start_time
+        try:
+            while time.time() - start_time < config.MAX_RUNTIME:
+                iteration += 1
+                elapsed = time.time() - start_time
 
+                try:
+                    # Fetch current market state
+                    market = await self.get_market()
+                    orderbook = await self.get_orderbook(depth=5)
+                    position = self.get_position()
+
+                    # Extract best bid/ask
+                    best_bid = market.get("yes_bid", 0)
+                    best_ask = market.get("yes_ask", 0)
+                    market_status = market.get("status", "")
+
+                    # Calculate inventory skew
+                    # Positive position (long YES) -> positive skew -> lower prices to sell
+                    inventory_skew = position.position * config.INVENTORY_SKEW_PER_CONTRACT
+
+                    # Only quote if market is active and has valid prices
+                    if market_status == "active" and best_bid > 0 and best_ask > 0:
+                        # Check if we should requote
+                        should_update, reason = self.quoter.should_requote(best_bid, best_ask)
+
+                        if should_update:
+                            logger.info(f"Requoting: {reason}")
+                            await self.quoter.update_quotes(
+                                best_bid=best_bid,
+                                best_ask=best_ask,
+                                inventory_skew=inventory_skew
+                            )
+                    else:
+                        # Market not active - cancel any existing quotes
+                        if self.quoter.has_any_quotes:
+                            logger.warning(f"Market not active ({market_status}), canceling quotes")
+                            await self.quoter.cancel_quotes()
+
+                    # Send update to UI if callback provided
+                    if update_callback:
+                        quote_state = self.quoter.get_state_summary()
+                        await update_callback({
+                            "market": market,
+                            "orderbook": orderbook,
+                            "position": position,
+                            "balance": self.available_balance,
+                            "exposure": self.position_manager.total_exposure_dollars,
+                            "iteration": iteration,
+                            "elapsed": elapsed,
+                            "quotes": quote_state,
+                            "inventory_skew": inventory_skew,
+                        })
+
+                except Exception as e:
+                    logger.error(f"Loop iteration {iteration} error: {e}")
+                    if update_callback:
+                        await update_callback({"error": str(e)})
+
+                await asyncio.sleep(config.LOOP_INTERVAL)
+
+        finally:
+            # Graceful shutdown: cancel all quotes
+            logger.info("Shutting down - canceling quotes")
             try:
-                # Fetch current market state
-                market = await self.get_market()
-                orderbook = await self.get_orderbook(depth=5)
-                position = self.get_position()
-
-                # Send update to UI if callback provided
-                if update_callback:
-                    await update_callback({
-                        "market": market,
-                        "orderbook": orderbook,
-                        "position": position,
-                        "balance": self.available_balance,
-                        "exposure": self.position_manager.total_exposure_dollars,
-                        "iteration": iteration,
-                        "elapsed": elapsed,
-                    })
-
-                # TODO: Trading strategy logic goes here
-                # - Analyze spread vs TARGET_SPREAD
-                # - Check liquidity vs MIN_LIQUIDITY
-                # - Place/adjust quotes
-                # - Manage risk
-
+                await self.quoter.cancel_quotes(force_clear=True)
             except Exception as e:
-                logger.error(f"Loop iteration {iteration} error: {e}")
-                if update_callback:
-                    await update_callback({"error": str(e)})
-
-            await asyncio.sleep(config.LOOP_INTERVAL)
+                logger.error(f"Error canceling quotes on shutdown: {e}")
 
         logger.info(f"Trading loop finished after {iteration} iterations")
 
