@@ -7,7 +7,7 @@ Configuration and global settings for Kalshi Market Maker Bot
 # ============================================================================
 
 # Specific market ticker to trade
-MARKET_TICKER = "KXHIGHTSFO-26JAN29-B63.5"
+MARKET_TICKER = "KXAPRPOTUS-26JAN30-42.4"
 
 # ============================================================================
 # MARKET MAKER PARAMETERS
@@ -54,3 +54,13 @@ MIN_MINUTES_TO_CLOSE = 30
 
 # Maximum loss threshold to stop trading (dollars)
 MAX_LOSS_THRESHOLD = 1
+
+# ============================================================================
+# POSITION TRACKING
+# ============================================================================
+
+# How often to poll for new fills (seconds)
+FILL_POLL_INTERVAL = 2
+
+# Maximum fills to fetch per poll request
+FILL_POLL_LIMIT = 50

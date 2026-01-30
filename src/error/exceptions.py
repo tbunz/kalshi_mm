@@ -16,3 +16,14 @@ class RateLimitError(APIError):
     def __init__(self, retry_after=None):
         self.retry_after = retry_after
         super().__init__(f"Rate limited. Retry after: {retry_after}s")
+
+
+# Position/Risk Errors
+class PositionLimitError(MarketMakerError):
+    """Attempted action would exceed position limits"""
+    pass
+
+
+class InsufficientBalanceError(MarketMakerError):
+    """Insufficient balance for requested action"""
+    pass

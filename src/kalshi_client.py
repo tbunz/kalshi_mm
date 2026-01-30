@@ -89,3 +89,65 @@ class KalshiClient:
 
     async def get_orderbook(self, ticker: str, depth: int = 10) -> dict:
         return await self.get(f"/markets/{ticker}/orderbook", {"depth": depth})
+
+    async def get_positions(
+        self,
+        ticker: str = None,
+        count_filter: str = None,
+        limit: int = 100,
+        cursor: str = None
+    ) -> dict:
+        """
+        Fetch portfolio positions.
+
+        Args:
+            ticker: Filter by specific market ticker
+            count_filter: Filter positions - 'position' or 'total_traded'
+            limit: Number of results (1-1000, default 100)
+            cursor: Pagination cursor
+        """
+        params = {}
+        if ticker:
+            params['ticker'] = ticker
+        if count_filter:
+            params['count_filter'] = count_filter
+        if limit != 100:
+            params['limit'] = limit
+        if cursor:
+            params['cursor'] = cursor
+        return await self.get("/portfolio/positions", params or None)
+
+    async def get_fills(
+        self,
+        ticker: str = None,
+        order_id: str = None,
+        min_ts: int = None,
+        max_ts: int = None,
+        limit: int = 100,
+        cursor: str = None
+    ) -> dict:
+        """
+        Fetch fill history (executed trades).
+
+        Args:
+            ticker: Filter by market ticker
+            order_id: Filter by specific order
+            min_ts: Unix timestamp - fills after this time
+            max_ts: Unix timestamp - fills before this time
+            limit: Number of results (1-200, default 100)
+            cursor: Pagination cursor
+        """
+        params = {}
+        if ticker:
+            params['ticker'] = ticker
+        if order_id:
+            params['order_id'] = order_id
+        if min_ts:
+            params['min_ts'] = min_ts
+        if max_ts:
+            params['max_ts'] = max_ts
+        if limit != 100:
+            params['limit'] = limit
+        if cursor:
+            params['cursor'] = cursor
+        return await self.get("/portfolio/fills", params or None)
