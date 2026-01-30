@@ -7,24 +7,24 @@ Configuration and global settings for Kalshi Market Maker Bot
 # ============================================================================
 
 # Specific market ticker to trade
-MARKET_TICKER = "KXHIGHLAX-26JAN30-B81.5"
+MARKET_TICKER = "KXHIGHTSFO-26JAN30-B63.5"
 
 # ============================================================================
 # MARKET MAKER PARAMETERS
 # ============================================================================
 
 # Maximum position size per market (number of contracts)
-MAX_POSITION_SIZE = 2
+MAX_POSITION_SIZE = 30
 
 # Maximum total exposure across all markets (in dollars)
-MAX_TOTAL_EXPOSURE = 2
+MAX_TOTAL_EXPOSURE = 5
 
 # ============================================================================
 # QUOTER PARAMETERS
 # ============================================================================
 
 # Total spread width in cents (our bid at mid - SPREAD_WIDTH/2, ask at mid + SPREAD_WIDTH/2)
-SPREAD_WIDTH = 2
+SPREAD_WIDTH = 4
 
 # Number of contracts per quote side
 QUOTE_SIZE = 1

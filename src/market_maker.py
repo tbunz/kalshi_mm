@@ -2,14 +2,16 @@ from .kalshi_client import KalshiClient
 from .position_manager import PositionManager
 from .order_manager import OrderManager
 from .quoter import Quoter
-from .models import Side
+from .models import Side, Fill
 from . import config
+from .logging_config import UILogHandler
 from src.error.exceptions import AuthenticationError
 from dotenv import load_dotenv
 import os
 import asyncio
 import logging
 import time
+from typing import List
 
 load_dotenv()
 KEY = os.getenv("KEY")
@@ -28,6 +30,10 @@ class MarketMakerBot:
         self.position_manager = PositionManager(self.client)
         self.order_manager = OrderManager(self.client)
         self.quoter = Quoter(self)
+
+        # Track recent fills for UI display
+        self._recent_fills: List[dict] = []
+
         logger.info("MarketMakerBot initialized successfully")
 
     async def __aenter__(self):
@@ -40,10 +46,28 @@ class MarketMakerBot:
         # Register quoter to receive fill notifications
         self.position_manager.register_fill_callback(self.quoter.on_fill)
 
+        # Register UI fill callback to track fills for display
+        self.position_manager.register_fill_callback(self._on_fill_for_ui)
+
         # Start background fill polling
         await self.position_manager.start_polling()
 
         return self
+
+    async def _on_fill_for_ui(self, fill: Fill) -> None:
+        """Track fills for UI display."""
+        fill_data = {
+            "time": fill.created_time.strftime("%H:%M:%S") if fill.created_time else "",
+            "action": fill.action.value if fill.action else "",
+            "qty": fill.count,
+            "side": fill.side.value if fill.side else "",
+            "price": fill.yes_price,
+            "order_id": fill.order_id,
+        }
+        self._recent_fills.append(fill_data)
+        # Keep only last 20 fills
+        if len(self._recent_fills) > 20:
+            self._recent_fills = self._recent_fills[-20:]
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit - ensures cleanup"""
@@ -275,6 +299,25 @@ class MarketMakerBot:
                     # Send update to UI if callback provided
                     if update_callback:
                         quote_state = self.quoter.get_state_summary()
+
+                        # Get open orders data for UI
+                        orders_data = {
+                            "bid": {
+                                "id": quote_state.get("bid_order_id"),
+                                "price": quote_state.get("bid_price"),
+                                "size": config.QUOTE_SIZE,
+                            } if quote_state.get("bid_order_id") else None,
+                            "ask": {
+                                "id": quote_state.get("ask_order_id"),
+                                "price": quote_state.get("ask_price"),
+                                "size": config.QUOTE_SIZE,
+                            } if quote_state.get("ask_order_id") else None,
+                        }
+
+                        # Get recent logs from UI handler
+                        log_handler = UILogHandler.get_instance()
+                        recent_logs = log_handler.get_recent_logs(10) if log_handler else []
+
                         await update_callback({
                             "market": market,
                             "orderbook": orderbook,
@@ -285,6 +328,9 @@ class MarketMakerBot:
                             "elapsed": elapsed,
                             "quotes": quote_state,
                             "inventory_skew": inventory_skew,
+                            "fills": self._recent_fills[-10:],
+                            "orders": orders_data,
+                            "logs": recent_logs,
                         })
 
                 except Exception as e:

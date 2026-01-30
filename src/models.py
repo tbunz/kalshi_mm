@@ -160,3 +160,20 @@ class TrackedPosition(BaseModel):
             return int(self.contracts * self.avg_entry_price)
         else:  # NO
             return int(self.contracts * (100 - self.avg_entry_price))
+
+    def calculate_unrealized_pnl_cents(self, current_price_cents: float) -> int:
+        """
+        Calculate unrealized P&L in cents based on current market price.
+
+        Args:
+            current_price_cents: Current market price (typically mid price)
+
+        Returns:
+            Unrealized P&L in cents (positive = profit, negative = loss)
+        """
+        if self.position == 0:
+            return 0
+        if self.position > 0:  # Long YES - profit if price goes UP
+            return int((current_price_cents - self.avg_entry_price) * self.position)
+        else:  # Long NO - profit if YES price goes DOWN
+            return int((self.avg_entry_price - current_price_cents) * abs(self.position))

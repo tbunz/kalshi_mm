@@ -62,7 +62,19 @@ class PositionPanel(Static):
         self._position = 0
         self._side = "flat"
         self._avg_price = 0.0
-        self._pnl = 0.0
+        self._realized_pnl = 0.0
+        self._unrealized_pnl = 0.0
+        self._total_pnl = 0.0
+
+    def _format_pnl(self, content: Text, pnl: float, bold: bool = False):
+        """Helper to format P&L value with color"""
+        style = "green" if pnl >= 0 else "red"
+        if bold:
+            style += " bold"
+        if pnl >= 0:
+            content.append(f"+${pnl:.2f}", style=style)
+        else:
+            content.append(f"-${abs(pnl):.2f}", style=style)
 
     def render(self) -> Panel:
         content = Text()
@@ -77,20 +89,38 @@ class PositionPanel(Static):
 
         content.append("Avg Price: ", style="dim")
         content.append(f"{self._avg_price:.0f}c\n", style="white")
-        content.append("P&L: ", style="dim")
 
-        if self._pnl >= 0:
-            content.append(f"+${self._pnl:.2f}", style="green")
-        else:
-            content.append(f"-${abs(self._pnl):.2f}", style="red")
+        # Realized P&L
+        content.append("Realized:   ", style="dim")
+        self._format_pnl(content, self._realized_pnl)
+        content.append("\n")
+
+        # Unrealized P&L
+        content.append("Unrealized: ", style="dim")
+        self._format_pnl(content, self._unrealized_pnl)
+        content.append("\n")
+
+        # Total P&L (emphasized)
+        content.append("Total P&L:  ", style="bold")
+        self._format_pnl(content, self._total_pnl, bold=True)
 
         return Panel(content, title="Position", border_style="blue")
 
-    def update_data(self, position: int, side: str, avg_price: float, pnl: float = 0.0):
+    def update_data(
+        self,
+        position: int,
+        side: str,
+        avg_price: float,
+        realized_pnl: float = 0.0,
+        unrealized_pnl: float = 0.0,
+        total_pnl: float = 0.0,
+    ):
         self._position = position
         self._side = side
         self._avg_price = avg_price
-        self._pnl = pnl
+        self._realized_pnl = realized_pnl
+        self._unrealized_pnl = unrealized_pnl
+        self._total_pnl = total_pnl
         self.refresh()
 
 
@@ -231,4 +261,89 @@ class StatusBar(Static):
         self._max_iterations = max_iterations
         self._elapsed = elapsed
         self._last_update = datetime.now()
+        self.refresh()
+
+
+class OpenOrdersPanel(Static):
+    """Displays our active quote orders"""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._bid_order = None  # {"id": str, "price": int, "size": int}
+        self._ask_order = None
+
+    def render(self) -> Panel:
+        content = Text()
+
+        if not self._bid_order and not self._ask_order:
+            content.append("No active orders", style="dim italic")
+        else:
+            if self._bid_order:
+                content.append("BID ", style="green bold")
+                content.append(f"{self._bid_order['price']}c ", style="green")
+                content.append(f"x{self._bid_order['size']} ", style="white")
+                order_id = self._bid_order.get('id', '')[:8]
+                content.append(f"[{order_id}...]\n", style="dim")
+            else:
+                content.append("BID ", style="dim")
+                content.append("- none -\n", style="dim italic")
+
+            if self._ask_order:
+                content.append("ASK ", style="red bold")
+                content.append(f"{self._ask_order['price']}c ", style="red")
+                content.append(f"x{self._ask_order['size']} ", style="white")
+                order_id = self._ask_order.get('id', '')[:8]
+                content.append(f"[{order_id}...]", style="dim")
+            else:
+                content.append("ASK ", style="dim")
+                content.append("- none -", style="dim italic")
+
+        return Panel(content, title="Open Orders", border_style="blue")
+
+    def update_data(self, bid_order: dict = None, ask_order: dict = None):
+        self._bid_order = bid_order
+        self._ask_order = ask_order
+        self.refresh()
+
+
+class LogPanel(Static):
+    """Displays recent log messages"""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._logs = []
+
+    def render(self) -> Panel:
+        content = Text()
+
+        if not self._logs:
+            content.append("No logs yet", style="dim italic")
+        else:
+            for log in self._logs[-8:]:  # Last 8 logs
+                time_str = log.get("time", "")
+                level = log.get("level", "INFO")
+                message = log.get("message", "")
+
+                # Color by level
+                if level == "ERROR":
+                    level_style = "red bold"
+                elif level == "WARNING":
+                    level_style = "yellow"
+                elif level == "DEBUG":
+                    level_style = "dim"
+                else:
+                    level_style = "cyan"
+
+                content.append(f"{time_str} ", style="dim")
+                content.append(f"| ", style="dim")
+
+                # Truncate long messages
+                if len(message) > 60:
+                    message = message[:57] + "..."
+                content.append(f"{message}\n", style=level_style)
+
+        return Panel(content, title="Logs", border_style="blue")
+
+    def update_data(self, logs: list):
+        self._logs = logs or []
         self.refresh()

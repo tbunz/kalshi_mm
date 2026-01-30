@@ -4,14 +4,57 @@ Logging configuration for the Kalshi Market Maker.
 Provides centralized logging setup with:
 - Console output for real-time monitoring
 - Rotating file logging for post-mortem analysis
+- UI handler for live display in the terminal UI
 - Custom formatter: HH:MM:SS | message
 """
 import logging
-import os
+from collections import deque
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+from typing import List, Dict
 
 from . import config
+
+
+class UILogHandler(logging.Handler):
+    """
+    Custom logging handler that buffers messages for UI display.
+
+    Thread-safe buffer that stores recent log records for the UI to consume.
+    """
+
+    _instance = None
+
+    def __init__(self, max_records: int = 100):
+        super().__init__()
+        self._buffer: deque = deque(maxlen=max_records)
+        UILogHandler._instance = self
+
+    @classmethod
+    def get_instance(cls) -> "UILogHandler":
+        """Get the singleton instance of the UI log handler."""
+        return cls._instance
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """Store formatted log record in buffer."""
+        try:
+            msg = self.format(record)
+            self._buffer.append({
+                "time": self.formatter.formatTime(record, "%H:%M:%S") if self.formatter else "",
+                "level": record.levelname,
+                "message": record.getMessage(),
+                "formatted": msg,
+            })
+        except Exception:
+            self.handleError(record)
+
+    def get_recent_logs(self, count: int = 10) -> List[Dict]:
+        """Get the most recent log entries."""
+        return list(self._buffer)[-count:]
+
+    def clear(self) -> None:
+        """Clear the log buffer."""
+        self._buffer.clear()
 
 
 class TradingFormatter(logging.Formatter):
@@ -65,6 +108,12 @@ def setup_logging() -> None:
     # Add handlers
     root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)
+
+    # UI handler for live display
+    ui_handler = UILogHandler(max_records=100)
+    ui_handler.setFormatter(formatter)
+    ui_handler.setLevel(log_level)
+    root_logger.addHandler(ui_handler)
 
     # Suppress noisy third-party loggers
     logging.getLogger("httpx").setLevel(logging.WARNING)

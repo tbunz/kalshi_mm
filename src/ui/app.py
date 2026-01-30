@@ -11,6 +11,8 @@ from .panels import (
     MarketPanel,
     OrderbookPanel,
     FillsPanel,
+    OpenOrdersPanel,
+    LogPanel,
     StatusBar,
     LiveClock,
 )
@@ -25,7 +27,7 @@ class MarketMakerApp(App):
     Screen {
         layout: grid;
         grid-size: 1;
-        grid-rows: 3 8 1fr 1;
+        grid-rows: 3 8 10 1fr 1;
     }
 
     #header-row {
@@ -53,7 +55,12 @@ class MarketMakerApp(App):
         layout: horizontal;
     }
 
-    #bottom-panels {
+    #middle-panels {
+        height: 10;
+        layout: horizontal;
+    }
+
+    #log-row {
         height: 100%;
         layout: horizontal;
     }
@@ -69,8 +76,13 @@ class MarketMakerApp(App):
         height: 100%;
     }
 
-    .bottom-panel {
+    .middle-panel {
         width: 1fr;
+        height: 100%;
+    }
+
+    #log-panel {
+        width: 100%;
         height: 100%;
     }
     """
@@ -102,9 +114,15 @@ class MarketMakerApp(App):
         )
 
         yield Horizontal(
-            OrderbookPanel(id="orderbook-panel", classes="bottom-panel"),
-            FillsPanel(id="fills-panel", classes="bottom-panel"),
-            id="bottom-panels",
+            OrderbookPanel(id="orderbook-panel", classes="middle-panel"),
+            OpenOrdersPanel(id="orders-panel", classes="middle-panel"),
+            FillsPanel(id="fills-panel", classes="middle-panel"),
+            id="middle-panels",
+        )
+
+        yield Horizontal(
+            LogPanel(id="log-panel"),
+            id="log-row",
         )
 
         yield Container(
@@ -158,11 +176,29 @@ class MarketMakerApp(App):
             # Update position panel
             if "position" in update:
                 pos = update["position"]
+
+                # Calculate P&L values
+                realized_pnl = pos.realized_pnl_cents / 100  # Convert to dollars
+
+                # Calculate unrealized using mid price from market data
+                unrealized_pnl = 0.0
+                if "market" in update and pos.position != 0:
+                    market = update["market"]
+                    yes_bid = market.get("yes_bid", 0)
+                    yes_ask = market.get("yes_ask", 0)
+                    if yes_bid > 0 and yes_ask > 0:
+                        mid_price = (yes_bid + yes_ask) / 2
+                        unrealized_pnl = pos.calculate_unrealized_pnl_cents(mid_price) / 100
+
+                total_pnl = realized_pnl + unrealized_pnl
+
                 self.query_one("#position-panel", PositionPanel).update_data(
                     position=pos.position,
                     side=pos.side.value if pos.side else "flat",
                     avg_price=pos.avg_entry_price,
-                    pnl=0.0,
+                    realized_pnl=realized_pnl,
+                    unrealized_pnl=unrealized_pnl,
+                    total_pnl=total_pnl,
                 )
 
             # Update market panel
@@ -181,6 +217,26 @@ class MarketMakerApp(App):
                 self.query_one("#orderbook-panel", OrderbookPanel).update_data(
                     yes_levels=ob.get("yes", []),
                     no_levels=ob.get("no", []),
+                )
+
+            # Update fills panel
+            if "fills" in update:
+                self.query_one("#fills-panel", FillsPanel).update_data(
+                    fills=update["fills"],
+                )
+
+            # Update open orders panel
+            if "orders" in update:
+                orders = update["orders"]
+                self.query_one("#orders-panel", OpenOrdersPanel).update_data(
+                    bid_order=orders.get("bid"),
+                    ask_order=orders.get("ask"),
+                )
+
+            # Update log panel
+            if "logs" in update:
+                self.query_one("#log-panel", LogPanel).update_data(
+                    logs=update["logs"],
                 )
 
             # Update status bar
